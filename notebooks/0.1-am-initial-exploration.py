@@ -194,30 +194,5 @@ def _(df_mx):
     return
 
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Separación 80/20 — `X_train` / `X_test`
-
-    Paso 3 del proyecto: 20% de los renglones para pruebas finales (`X_test`), 80% para entrenamiento (`X_train`). `random_state=42` para reproducibilidad.
-
-    Nota: el PDF pide un split simple; si se quisiera preservar la proporción de fraude en ambos conjuntos, se puede usar `stratify=df_mx["is_fraud"]`.
-    """)
-    return
-
-
-@app.cell
-def _(df_mx):
-    from sklearn.model_selection import train_test_split
-
-    X_train, X_test = train_test_split(df_mx, test_size=0.2, random_state=42)
-    print(f"X_train: {X_train.shape}   X_test: {X_test.shape}")
-    print(
-        f"Fraude en train: {X_train['is_fraud'].mean():.2%} | "
-        f"en test: {X_test['is_fraud'].mean():.2%}"
-    )
-    return
-
-
 if __name__ == "__main__":
     app.run()
