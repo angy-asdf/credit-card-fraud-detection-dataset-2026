@@ -1,28 +1,29 @@
 from pathlib import Path
 
 from loguru import logger
-from tqdm import tqdm
+import pandas as pd
 import typer
 
-from credit_card_fraud_detection_dataset_2026.config import PROCESSED_DATA_DIR
+from credit_card_fraud_detection_dataset_2026.config import INTERIM_DATA_DIR, RAW_DATA_DIR
 
 app = typer.Typer()
 
 
 @app.command()
 def main(
-    # ---- REPLACE DEFAULT PATHS AS APPROPRIATE ----
-    input_path: Path = PROCESSED_DATA_DIR / "dataset.csv",
-    output_path: Path = PROCESSED_DATA_DIR / "features.csv",
-    # -----------------------------------------
+    input_path: Path = RAW_DATA_DIR / "credit_card_fraud_detection_2026.csv",
+    output_path: Path = INTERIM_DATA_DIR / "mexico_numeric.csv",
 ):
-    # ---- REPLACE THIS WITH YOUR OWN CODE ----
-    logger.info("Generating features from dataset...")
-    for i in tqdm(range(10), total=10):
-        if i == 5:
-            logger.info("Something happened for iteration 5.")
-    logger.success("Features generation complete.")
-    # -----------------------------------------
+    """Filter transactions in Mexico and keep numeric columns plus is_fraud."""
+    logger.info(f"Loading raw data from {input_path}...")
+    df = pd.read_csv(input_path)
+
+    df_mx = df[df["merchant_country"] == "Mexico"]
+    df_numeric = df_mx.select_dtypes(include="number")  # is_fraud (int64) is included
+
+    INTERIM_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    df_numeric.to_csv(output_path, index=False)
+    logger.success(f"{len(df_numeric):,} rows x {df_numeric.shape[1]} cols -> {output_path}")
 
 
 if __name__ == "__main__":

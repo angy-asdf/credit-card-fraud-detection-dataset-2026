@@ -34,13 +34,15 @@ def _():
 @app.cell
 def _():
     from credit_card_fraud_detection_dataset_2026.config import (
+        INTERIM_DATA_DIR,
         PROJ_ROOT,
         RAW_DATA_DIR,
     )
 
     DATA_DICT_PATH = PROJ_ROOT / "references" / "data_dictionary.csv"
     RAW_CSV = RAW_DATA_DIR / "credit_card_fraud_detection_2026.csv"
-    return DATA_DICT_PATH, RAW_CSV
+    INTERIM_CSV = INTERIM_DATA_DIR / "mexico_numeric.csv"
+    return DATA_DICT_PATH, INTERIM_CSV, RAW_CSV
 
 
 @app.cell(hide_code=True)
@@ -142,6 +144,78 @@ def _(corr_matrix, plt):
     ax.set_title("Matriz de correlación (columnas numéricas)")
     fig.tight_layout()
     fig
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Datos interim: México (columnas numéricas + `is_fraud`)
+
+    Generado por `credit_card_fraud_detection_dataset_2026/features.py`: filtra `merchant_country == "Mexico"` del raw y conserva solo las columnas numéricas (que ya incluyen `is_fraud`, tipo `int64`) — pasos 1 y 2 del proyecto.
+    """)
+    return
+
+
+@app.cell
+def _(INTERIM_CSV, pd):
+    df_mx = pd.read_csv(INTERIM_CSV)
+    print(
+        f"{len(df_mx):,} transacciones México | "
+        f"{df_mx['is_fraud'].sum()} fraudes ({df_mx['is_fraud'].mean():.2%})"
+    )
+    df_mx
+    return (df_mx,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## EDA del subconjunto México
+    """)
+    return
+
+
+@app.cell
+def _(df_mx):
+    df_mx.columns.tolist()
+    return
+
+
+@app.cell
+def _(df_mx):
+    df_mx.info()
+    return
+
+
+@app.cell
+def _(df_mx):
+    df_mx.describe().T
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Separación 80/20 — `X_train` / `X_test`
+
+    Paso 3 del proyecto: 20% de los renglones para pruebas finales (`X_test`), 80% para entrenamiento (`X_train`). `random_state=42` para reproducibilidad.
+
+    Nota: el PDF pide un split simple; si se quisiera preservar la proporción de fraude en ambos conjuntos, se puede usar `stratify=df_mx["is_fraud"]`.
+    """)
+    return
+
+
+@app.cell
+def _(df_mx):
+    from sklearn.model_selection import train_test_split
+
+    X_train, X_test = train_test_split(df_mx, test_size=0.2, random_state=42)
+    print(f"X_train: {X_train.shape}   X_test: {X_test.shape}")
+    print(
+        f"Fraude en train: {X_train['is_fraud'].mean():.2%} | "
+        f"en test: {X_test['is_fraud'].mean():.2%}"
+    )
     return
 
 

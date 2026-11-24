@@ -62,6 +62,11 @@ create_environment:
 data: requirements
 	$(PYTHON_INTERPRETER) credit_card_fraud_detection_dataset_2026/dataset.py
 
+## Make interim features (Mexico, numeric + is_fraud)
+.PHONY: features
+features: requirements
+	$(PYTHON_INTERPRETER) credit_card_fraud_detection_dataset_2026/features.py
+
 
 #################################################################################
 # Self Documenting Commands                                                     #
