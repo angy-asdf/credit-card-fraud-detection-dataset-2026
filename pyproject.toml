@@ -30,3 +30,7 @@ extend-select = ["I"]  # Add import sorting
 known-first-party = ["credit_card_fraud_detection_dataset_2026"]
 force-sort-within-sections = true
 
+[tool.ruff.lint.per-file-ignores]
+# marimo cell semantics: bare returns export nothing, trailing expressions render output
+"notebooks/**" = ["B018", "PLR1711"]
+

@@ -2,6 +2,7 @@ ipython
 jupyterlab
 kagglehub
 loguru
+marimo
 matplotlib
 notebook
 numpy

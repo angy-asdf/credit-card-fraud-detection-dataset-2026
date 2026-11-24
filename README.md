@@ -34,6 +34,25 @@ Columnas del diccionario:
 | `top_values` | Los 3 valores más frecuentes — solo columnas **no numéricas** (p. ej. el país o categoría que más aparece) |
 | `min`, `max`, `mean` | Mínimo, máximo y promedio — solo columnas **numéricas** |
 
+## Libretas (marimo)
+
+Las libretas del proyecto usan **[marimo](https://marimo.io)** en lugar de Jupyter: se guardan como `.py` plano, así que los commits solo contienen código — los outputs nunca se escriben al archivo (se regeneran al abrirla).
+
+**Abrir una libreta** (con el venv activado):
+
+```bash
+marimo edit notebooks/0.1-am-initial-exploration.py
+```
+
+Abre el editor en `http://localhost:2718` — se usa como Jupyter: celdas de código y markdown, outputs en vivo.
+
+Notas:
+
+- Cada variable se define **una sola vez** en toda la libreta (ejecución reactiva); si reasignas un nombre, marimo te avisa.
+- Una libreta también corre como script: `python notebooks/0.1-am-initial-exploration.py`.
+- Opcional: extensión oficial de VS Code `marimo-team.vscode-marimo` para ver la libreta dentro del editor.
+- No requiere kernelspec de Jupyter — marimo usa el entorno desde donde se lanza.
+
 ## Project Organization
 
 ```
