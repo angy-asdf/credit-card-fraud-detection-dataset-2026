@@ -6,6 +6,34 @@
 
 Deteccion de fraude financiero mediante el kernel de Christoffel-Darboux
 
+## Fuente de datos
+
+**[Credit Card Fraud Detection Dataset 2026](https://www.kaggle.com/datasets/mohankrishnathalla/credit-card-fraud-detection-dataset-2026)** — Mohan Krishna Thalla (Kaggle), licencia CC0: Public Domain.
+
+- 100,000 transacciones sintéticas de tarjeta de crédito, calendario 2024 completo
+- 43 features con nombres reales: detalles de transacción, perfil de cliente, señales de velocidad, indicadores de riesgo, dispositivo/canal y comportamiento de cuenta
+- Calibrado contra investigación publicada (Federal Reserve, Nilson Report, FICO, Banco Central Europeo); tasa de fraude global ~2.06%
+- 3 targets: `is_fraud` (binario), `fraud_type` (5 clases), `fraud_amount_lost` (regresión)
+
+**Descarga:** `python credit_card_fraud_detection_dataset_2026/dataset.py` (o `make data`) usa `kagglehub` y requiere credenciales en `~/.kaggle/kaggle.json`. El CSV se copia a `data/raw/credit_card_fraud_detection_2026.csv` (inmutable; `data/` está en `.gitignore`).
+
+## Diccionario de datos
+
+`dataset.py` genera `references/data_dictionary.csv` y `references/data_dictionary.md` en cada corrida del pipeline. La información de columnas se recupera de la fuente misma: vía la API de Kaggle se toma la tabla **Feature Groups** (grupo temático de cada columna) y las descripciones de **Target Variables**, y se combina con un perfilado del CSV real.
+
+Columnas del diccionario:
+
+| Columna | Significado |
+|---|---|
+| `column` | Nombre de la columna en el dataset |
+| `group` | Grupo temático asignado por el autor (Transaction Identifiers, Transaction Details, Customer Profile, Velocity Features, Risk Signals, Device and Channel, Account Behaviour, Targets) |
+| `dtype` | Tipo de dato inferido por pandas (`int64`, `float64`, `object`) |
+| `description` | Texto de la fuente: descripción oficial para las 3 targets; para el resto, su grupo (la fuente no provee descripciones individuales) |
+| `non_null` | Filas con valor no nulo en esa columna |
+| `n_unique` | Cantidad de valores distintos |
+| `top_values` | Los 3 valores más frecuentes — solo columnas **no numéricas** (p. ej. el país o categoría que más aparece) |
+| `min`, `max`, `mean` | Mínimo, máximo y promedio — solo columnas **numéricas** |
+
 ## Project Organization
 
 ```
