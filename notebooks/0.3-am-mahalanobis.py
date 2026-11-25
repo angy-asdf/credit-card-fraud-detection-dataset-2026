@@ -67,11 +67,11 @@ def _(mo):
     mo.md(r"""
     ## Paso 6: distancia de Mahalanobis
 
-    Primera propuesta del PDF. De `X_train_pca` se filtran las transacciones legítimas (`X_train_legit`) y **solo sobre ellas** se estiman el centro $\mu$ y la covarianza $\Sigma$. La distancia de Mahalanobis
+    Primera propuesta del PDF. De `X_train_pca` se filtran las transacciones **no fraudulentas** — el PDF llama a este conjunto `X_train_legit` — y **solo sobre ellas** se estiman el centro $\mu$ y la covarianza $\Sigma$. La distancia de Mahalanobis
 
     $$d_M(x)^2 = (x-\mu)^{\top}\Sigma^{-1}(x-\mu)$$
 
-    mide qué tan lejos está un punto del centro de las legítimas, ponderando por la covarianza: una desviación en una dirección de mucha varianza "pesa" menos que una en una dirección de poca varianza — por eso las "bolas" $\{x : d_M(x) \le r\}$ son elipsoides, no esferas. Las PCs son incorrelacionadas por construcción, así que $\Sigma$ es casi diagonal.
+    mide qué tan lejos está un punto del centro de las no fraudulentas, ponderando por la covarianza: una desviación en una dirección de mucha varianza "pesa" menos que una en una dirección de poca varianza — por eso las "bolas" $\{x : d_M(x) \le r\}$ son elipsoides, no esferas. Las PCs son incorrelacionadas por construcción, así que $\Sigma$ es casi diagonal.
 
     **¿En qué dimensión se calcula esta distancia?** En $\mathbb{R}^{10}$ — el espacio de las 10 componentes principales (en el ejercicio didáctico del final, en $\mathbb{R}^2$ con PC1–PC2).
     """)
@@ -86,7 +86,7 @@ def _(X_train_pca, np, pd):
     mu = X_train_legit.mean().to_numpy()
     Sigma = np.cov(X_train_legit, rowvar=False)
     Sigma_inv = np.linalg.inv(Sigma)
-    print(f"Legítimas train: {X_train_legit.shape} | Sigma: {Sigma.shape}")
+    print(f"No fraudulentas train: {X_train_legit.shape} | Sigma: {Sigma.shape}")
     pd.DataFrame(Sigma, index=pc_cols, columns=pc_cols).round(2)
     return Sigma_inv, X_train_legit, mu, pc_cols
 
@@ -96,7 +96,7 @@ def _(mo):
     mo.md(r"""
     ## Radios por percentil
 
-    El PDF pide: dado un porcentaje $n\%$, encontrar el radio $r_n$ tal que el $n\%$ de las legítimas quede dentro de la bola $B_n(0) = \{x : d_M(x) \le r_n\}$ — es decir, el **percentil empírico** $n$ de las distancias de las legítimas.
+    El PDF pide: dado un porcentaje $n\%$, encontrar el radio $r_n$ tal que el $n\%$ de las no fraudulentas quede dentro de la bola $B_n(0) = \{x : d_M(x) \le r_n\}$ — es decir, el **percentil empírico** $n$ de las distancias de las no fraudulentas.
 
     **"Pero que no contenga $(n+1)\%$"**: pide el radio *mínimo* que captura $\ge n\%$ — un radio más grande capturaría de más. Con $N$ puntos se ordenan las distancias y se toma la $k$-ésima con $k = \lceil nN/100 \rceil$: entonces la fracción dentro es $k/N \ge n\%$ por construcción, y $k/N < (n+1)\%$ mientras $N \ge 100$ — con $N=1492$ se cumple para todo $n$ (para $n=99$: $1478/1492 = 99.06\% < 100\%$).
     """)
@@ -106,12 +106,12 @@ def _(mo):
 @app.cell
 def _(Sigma_inv, X_train_legit, mu, np, pd):
     def d2(x):
-        """d_M(x)^2 con los parámetros de las legítimas (x: matriz N x d)."""
+        """d_M(x)^2 con los parámetros de las no fraudulentas (x: matriz N x d)."""
         _c = np.atleast_2d(x) - mu
         return np.einsum("ij,jk,ik->i", _c, Sigma_inv, _c)
 
     def radio_n(distancias_legit, n):
-        """Radio r_n tal que n% de las legítimas queda dentro de B_rn(0),
+        """Radio r_n tal que n% de las no fraudulentas queda dentro de B_rn(0),
         pero que no contiene (n+1)%: la k-ésima distancia ordenada,
         con k = ceil(nN/100)."""
         _ds = np.sort(np.asarray(distancias_legit))
@@ -134,18 +134,18 @@ def _(mo):
     mo.md(r"""
     ## Zonas de seguridad (con los fraudes de train)
 
-    Los percentiles definen "qué tan típico" es un punto respecto a las legítimas — de ahí salen las bandas:
+    Los percentiles definen "qué tan típico" es un punto respecto a las no fraudulentas — de ahí salen las bandas:
 
     | Zona | Región | Significado |
     |---|---|---|
-    | **seguridad extrema** | $d_M < r_{50}$ | Donde vive la mitad más típica de las legítimas — el "núcleo" del comportamiento normal |
-    | **alta** | $r_{50} \le d_M < r_{90}$ | Zona normal pero menos densa — hasta el 90% de las legítimas caben aquí |
-    | **baja** | $r_{90} \le d_M < r_{99}$ | Periferia: solo ~9% de las legítimas llegan tan lejos |
-    | **peligro** | $d_M \ge r_{99}$ | Región donde **menos del 1%** de las legítimas caen → un punto ahí es estadísticamente atípico = sospechoso |
+    | **seguridad extrema** | $d_M < r_{50}$ | Donde vive la mitad más típica de las no fraudulentas — el "núcleo" del comportamiento normal |
+    | **alta** | $r_{50} \le d_M < r_{90}$ | Zona normal pero menos densa — hasta el 90% de las no fraudulentas caben aquí |
+    | **baja** | $r_{90} \le d_M < r_{99}$ | Periferia: solo ~9% de las no fraudulentas llegan tan lejos |
+    | **peligro** | $d_M \ge r_{99}$ | Región donde **menos del 1%** de las no fraudulentas caen → un punto ahí es estadísticamente atípico = sospechoso |
 
-    **Qué significa "peligro"**: no "fraude seguro", sino la zona donde el comportamiento legítimo casi nunca llega — el detector reporta como anómalo lo que cae ahí. Una legítima en la zona de peligro se convierte en falso positivo; un fraude que cae dentro de las bolas se escapa (falso negativo).
+    **Qué significa "peligro"**: no "fraude seguro", sino la zona donde el comportamiento normal casi nunca llega — el detector reporta como anómalo lo que cae ahí. Una no fraudulenta en la zona de peligro se convierte en falso positivo; un fraude que cae dentro de las bolas se escapa (falso negativo).
 
-    *Matiz*: el PDF nombra las categorías pero no fija las fronteras — la asignación con $r_{50}$/$r_{90}$/$r_{99}$ es nuestra elección de diseño (reusa los radios ya calculados). La tabla siguiente muestra cuántos fraudes y legítimas de train caen por banda: la evidencia de si la partición separa.
+    *Matiz*: el PDF nombra las categorías pero no fija las fronteras — la asignación con $r_{50}$/$r_{90}$/$r_{99}$ es nuestra elección de diseño (reusa los radios ya calculados). La tabla siguiente muestra cuántos fraudes y no fraudulentas de train caen por banda: la evidencia de si la partición separa.
     """)
     return
 
@@ -169,7 +169,7 @@ def _(X_train_pca, d2, np, pc_cols, pd, radios):
         .groupby(["zona", "is_fraud"], observed=True)
         .size()
         .unstack(fill_value=0)
-        .rename(columns={0: "legítimas", 1: "fraudes"})
+        .rename(columns={0: "no fraudulentas", 1: "fraudes"})
         .reindex(["extrema", "alta", "baja", "peligro"])
     )
     zonas
@@ -181,7 +181,7 @@ def _(mo):
     mo.md(r"""
     ## Validación con `X_test_pca`
 
-    Regla de detección por umbral: un punto **fuera** de la bola se reporta como fraude. **FP** = legítimas marcadas como fraude (falsos positivos); **FN** = fraudes dentro de la bola que se escapan (falsos negativos). Solo hay 8 fraudes en test — los FN se leen de a uno.
+    Regla de detección por umbral: un punto **fuera** de la bola se reporta como fraude. **FP** = no fraudulentas marcadas como fraude (falsos positivos); **FN** = fraudes dentro de la bola que se escapan (falsos negativos). Solo hay 8 fraudes en test — los FN se leen de a uno.
     """)
     return
 
@@ -196,7 +196,7 @@ def _(X_test_pca, d2, np, pc_cols, pd, radios):
         _fuera = d_test >= _r
         _filas.append(
             {
-                "FP (legítimas fuera)": int((_fuera & ~_fraud_te).sum()),
+                "FP (no fraudulentas fuera)": int((_fuera & ~_fraud_te).sum()),
                 "FN (fraudes dentro)": int((~_fuera & _fraud_te).sum()),
                 "fraudes detectados": int((_fuera & _fraud_te).sum()),
             }
@@ -236,7 +236,7 @@ def _(X_train_legit, X_train_pca, np, plt, radio_n):
 
     _fig, _ax = plt.subplots(figsize=(7, 6))
     _ax.scatter(
-        _legit2[:, 0], _legit2[:, 1], s=8, alpha=0.3, c="gray", label="Legítima"
+        _legit2[:, 0], _legit2[:, 1], s=8, alpha=0.3, c="gray", label="No fraudulenta"
     )
     _fraud2 = X_train_pca.loc[X_train_pca["is_fraud"] == 1, _pc2]
     _ax.scatter(_fraud2["PC1"], _fraud2["PC2"], s=25, alpha=0.8, c="red", label="Fraude")
@@ -286,7 +286,7 @@ def _(MODELS_DIR, Sigma2_inv, X_test_pca, mu2, np, pd, radios2, validacion):
         _fuera = _d2t2 >= _r
         _filas.append(
             {
-                "FP (legítimas fuera)": int((_fuera & ~_fraud_te).sum()),
+                "FP (no fraudulentas fuera)": int((_fuera & ~_fraud_te).sum()),
                 "FN (fraudes dentro)": int((~_fuera & _fraud_te).sum()),
                 "fraudes detectados": int((_fuera & _fraud_te).sum()),
             }

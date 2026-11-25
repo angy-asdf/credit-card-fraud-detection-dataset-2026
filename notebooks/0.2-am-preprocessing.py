@@ -184,7 +184,7 @@ def _(mo):
     mo.md(r"""
     ## Transacciones proyectadas en PC1 vs PC2
 
-    Cada punto es una transacción de `X_train` vista en las dos primeras componentes (las de mayor varianza). Si los fraudes se separan de las legítimas en este plano, es buena señal de que la geometría de los pasos siguientes (Mahalanobis, kernel CD) puede distinguirlos.
+    Cada punto es una transacción de `X_train` vista en las dos primeras componentes (las de mayor varianza). Si los fraudes se separan de las no fraudulentas en este plano, es buena señal de que la geometría de los pasos siguientes (Mahalanobis, kernel CD) puede distinguirlos.
     """)
     return
 
@@ -198,7 +198,7 @@ def _(X_train_pca, pca, plt):
         X_train_pca.loc[_legit, "PC2"],
         s=8,
         alpha=0.4,
-        label="Legítima",
+        label="No fraudulenta",
     )
     _ax.scatter(
         X_train_pca.loc[~_legit, "PC1"],
@@ -302,7 +302,7 @@ def _(X_test_pca, X_train_pca, plt):
         s=8,
         alpha=0.3,
         c="gray",
-        label="Train legítima",
+        label="Train no fraudulenta",
     )
     _ax.scatter(
         X_train_pca.loc[~_legit_tr, "PC1"],
@@ -319,7 +319,7 @@ def _(X_test_pca, X_train_pca, plt):
         alpha=0.7,
         c="steelblue",
         marker="x",
-        label="Test legítima",
+        label="Test no fraudulenta",
     )
     _ax.scatter(
         X_test_pca.loc[~_legit_te, "PC1"],

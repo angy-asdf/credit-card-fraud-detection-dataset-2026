@@ -116,7 +116,7 @@ def _(mo):
     mo.md(r"""
     ## Matriz de correlación
 
-    Correlación de Pearson entre columnas numéricas (covarianza estandarizada, valores en $[-1, 1]$). La matriz de covarianzas $\Sigma$ sobre las transacciones legítimas es la que usará después la distancia de Mahalanobis.
+    Correlación de Pearson entre columnas numéricas (covarianza estandarizada, valores en $[-1, 1]$). La matriz de covarianzas $\Sigma$ sobre las transacciones no fraudulentas es la que usará después la distancia de Mahalanobis.
     """)
     return
 
