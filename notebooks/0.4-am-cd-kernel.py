@@ -16,9 +16,8 @@ def _():
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
-    from sklearn.metrics import confusion_matrix
 
-    return confusion_matrix, np, pd, plt
+    return np, pd, plt
 
 
 @app.cell(hide_code=True)
@@ -65,37 +64,16 @@ def _(mo):
 
 
 @app.cell
-def _(np):
-    from itertools import combinations_with_replacement
+def _():
+    from credit_card_fraud_detection_dataset_2026.modeling.anomaly import (
+        cd_fit,
+        cd_score,
+        evaluate,
+        phi,
+        radio_n,
+    )
 
-    def phi(X, degree):
-        """Mapa a la base de monomios de grado total <= degree (X: N x d -> N x C(d+g, g))."""
-        _X = np.atleast_2d(np.asarray(X, dtype=float))
-        _cols = [np.ones(len(_X))]
-        for _total in range(1, degree + 1):
-            for _idx in combinations_with_replacement(range(_X.shape[1]), _total):
-                _cols.append(np.prod(_X[:, _idx], axis=1))
-        return np.column_stack(_cols)
-
-    def cd_fit(legit_X, degree, lam=1e-6):
-        """Ajusta el kernel CD en legit_X: devuelve M_reg^{-1} = (M_n + lam*I)^{-1}."""
-        _D = phi(legit_X, degree)
-        _M = _D.T @ _D / len(_D) + lam * np.eye(_D.shape[1])
-        return np.linalg.inv(_M), _D
-
-    def cd_score(x, M_inv, degree):
-        """p_CD(x) = phi(x)^T M_reg^{-1} phi(x)."""
-        _p = phi(x, degree)
-        return np.einsum("ij,jk,ik->i", _p, M_inv, _p)
-
-    def radio_n(valores_legit, n):
-        """Nivel/radio l_n tal que n% de las no fraudulentas queda dentro,
-        sin contener (n+1)%: el k-esimo valor ordenado, k = ceil(nN/100)."""
-        _ds = np.sort(np.asarray(valores_legit))
-        _k = int(np.ceil(n / 100 * len(_ds)))
-        return float(_ds[_k - 1])
-
-    return cd_fit, cd_score, phi, radio_n
+    return cd_fit, cd_score, evaluate, phi, radio_n
 
 
 @app.cell(hide_code=True)
@@ -206,17 +184,13 @@ def _(mo):
 
 
 @app.cell
-def _(X_test_pca, M_inv, cd_score, confusion_matrix, niveles, np, pd):
+def _(X_test_pca, M_inv, cd_score, evaluate, niveles):
     _sc = cd_score(X_test_pca[["PC1", "PC2"]].to_numpy(), M_inv, 2)
-    _fraud = X_test_pca["is_fraud"] == 1
-
-    _filas = []
-    for _l in niveles.values():
-        _tn, _fp, _fn, _tp = confusion_matrix(_fraud, _sc > _l).ravel()
-        _filas.append({"TN": _tn, "FP": _fp, "FN": _fn, "TP": _tp})
-    validacion_cd2 = pd.DataFrame(
-        _filas, index=[f"λ{n}" for n in niveles]
-    ).rename_axis("umbral")
+    validacion_cd2 = evaluate(
+        _sc,
+        X_test_pca["is_fraud"] == 1,
+        {f"λ{n}": l for n, l in niveles.items()},
+    )
     validacion_cd2
     return (validacion_cd2,)
 
@@ -262,17 +236,13 @@ def _(X_train_legit, X_train_pca, cd_fit, cd_score, np, pd, plt, radio_n):
 
 
 @app.cell
-def _(X_test_pca, M_inv4, cd_score, confusion_matrix, niveles4, np, pd):
+def _(X_test_pca, M_inv4, cd_score, evaluate, niveles4):
     _sc = cd_score(X_test_pca[["PC1", "PC2"]].to_numpy(), M_inv4, 4)
-    _fraud = X_test_pca["is_fraud"] == 1
-
-    _filas = []
-    for _l in niveles4.values():
-        _tn, _fp, _fn, _tp = confusion_matrix(_fraud, _sc > _l).ravel()
-        _filas.append({"TN": _tn, "FP": _fp, "FN": _fn, "TP": _tp})
-    validacion_cd4 = pd.DataFrame(
-        _filas, index=[f"λ{n}" for n in niveles4]
-    ).rename_axis("umbral")
+    validacion_cd4 = evaluate(
+        _sc,
+        X_test_pca["is_fraud"] == 1,
+        {f"λ{n}": l for n, l in niveles4.items()},
+    )
     validacion_cd4
     return (validacion_cd4,)
 
@@ -293,8 +263,7 @@ def _(
     X_train_legit,
     cd_fit,
     cd_score,
-    confusion_matrix,
-    np,
+    evaluate,
     pc_cols,
     pd,
     radio_n,
@@ -302,7 +271,7 @@ def _(
     import time
 
     _fraud = X_test_pca["is_fraud"] == 1
-    _filas = []
+    _tablas = []
     for _k in [5, 7, 10]:
         _cols = pc_cols[:_k]
         _t0 = time.perf_counter()
@@ -310,21 +279,17 @@ def _(
         _p_leg = cd_score(X_train_legit[_cols].to_numpy(), _Mi, 2)
         _sc = cd_score(X_test_pca[_cols].to_numpy(), _Mi, 2)
         _t = time.perf_counter() - _t0
-        for _n in [50, 75, 90, 95, 99]:
-            _l = radio_n(_p_leg, _n)
-            _tn, _fp, _fn, _tp = confusion_matrix(_fraud, _sc > _l).ravel()
-            _filas.append(
-                {
-                    "comps": _k,
-                    "umbral": f"λ{_n}",
-                    "TN": _tn,
-                    "FP": _fp,
-                    "FN": _fn,
-                    "TP": _tp,
-                    "t (ms)": round(_t * 1000, 1),
-                }
+        _tablas.append(
+            evaluate(
+                _sc,
+                _fraud,
+                {f"λ{n}": radio_n(_p_leg, n) for n in [50, 75, 90, 95, 99]},
             )
-    comparacion_k = pd.DataFrame(_filas).set_index(["comps", "umbral"])
+            .rename_axis("umbral")
+            .assign(comps=_k, **{"t (ms)": round(_t * 1000, 1)})
+            .reset_index()
+        )
+    comparacion_k = pd.concat(_tablas).set_index(["comps", "umbral"])
     comparacion_k
     return (comparacion_k,)
 

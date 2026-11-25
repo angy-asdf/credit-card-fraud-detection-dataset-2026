@@ -16,9 +16,8 @@ def _():
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
-    from sklearn.metrics import confusion_matrix
 
-    return confusion_matrix, np, pd, plt
+    return np, pd, plt
 
 
 @app.cell(hide_code=True)
@@ -41,6 +40,18 @@ def _():
     X_TRAIN_PCA = PROCESSED_DATA_DIR / "x_train_pca.csv"
     X_TEST_PCA = PROCESSED_DATA_DIR / "x_test_pca.csv"
     return MODELS_DIR, X_TEST_PCA, X_TRAIN_PCA
+
+
+@app.cell
+def _():
+    from credit_card_fraud_detection_dataset_2026.modeling.anomaly import (
+        evaluate,
+        mahalanobis_fit,
+        mahalanobis_score,
+        radio_n,
+    )
+
+    return evaluate, mahalanobis_fit, mahalanobis_score, radio_n
 
 
 @app.cell(hide_code=True)
@@ -80,13 +91,11 @@ def _(mo):
 
 
 @app.cell
-def _(X_train_pca, np, pd):
+def _(X_train_pca, mahalanobis_fit, pd):
     pc_cols = [c for c in X_train_pca.columns if c != "is_fraud"]
     X_train_legit = X_train_pca.loc[X_train_pca["is_fraud"] == 0, pc_cols]
 
-    mu = X_train_legit.mean().to_numpy()
-    Sigma = np.cov(X_train_legit, rowvar=False)
-    Sigma_inv = np.linalg.inv(Sigma)
+    mu, Sigma, Sigma_inv = mahalanobis_fit(X_train_legit)
     print(f"No fraudulentas train: {X_train_legit.shape} | Sigma: {Sigma.shape}")
     pd.DataFrame(Sigma, index=pc_cols, columns=pc_cols).round(2)
     return Sigma_inv, X_train_legit, mu, pc_cols
@@ -105,21 +114,8 @@ def _(mo):
 
 
 @app.cell
-def _(Sigma_inv, X_train_legit, mu, np, pd):
-    def d2(x):
-        """d_M(x)^2 con los parámetros de las no fraudulentas (x: matriz N x d)."""
-        _c = np.atleast_2d(x) - mu
-        return np.einsum("ij,jk,ik->i", _c, Sigma_inv, _c)
-
-    def radio_n(distancias_legit, n):
-        """Radio r_n tal que n% de las no fraudulentas queda dentro de B_rn(0),
-        pero que no contiene (n+1)%: la k-ésima distancia ordenada,
-        con k = ceil(nN/100)."""
-        _ds = np.sort(np.asarray(distancias_legit))
-        _k = int(np.ceil(n / 100 * len(_ds)))
-        return float(_ds[_k - 1])
-
-    d_legit = np.sqrt(d2(X_train_legit.to_numpy()))
+def _(Sigma_inv, X_train_legit, mahalanobis_score, mu, pd, radio_n):
+    d_legit = mahalanobis_score(X_train_legit.to_numpy(), mu, Sigma_inv)
     radios = {n: radio_n(d_legit, n) for n in [50, 75, 90, 95, 99]}
 
     radios_df = pd.DataFrame(
@@ -127,7 +123,7 @@ def _(Sigma_inv, X_train_legit, mu, np, pd):
     ).rename_axis("n% dentro")
     print(radios_df.round(3))
     radios_df.round(3)
-    return d2, d_legit, radio_n, radios
+    return d_legit, radios
 
 
 @app.cell(hide_code=True)
@@ -152,8 +148,8 @@ def _(mo):
 
 
 @app.cell
-def _(X_train_pca, d2, np, pc_cols, pd, radios):
-    d_train_all = np.sqrt(d2(X_train_pca[pc_cols].to_numpy()))
+def _(Sigma_inv, X_train_pca, mahalanobis_score, mu, pc_cols, pd, radios):
+    d_train_all = mahalanobis_score(X_train_pca[pc_cols].to_numpy(), mu, Sigma_inv)
 
     def _zona(d):
         if d < radios[50]:
@@ -190,16 +186,20 @@ def _(mo):
 
 
 @app.cell
-def _(X_test_pca, confusion_matrix, d2, np, pc_cols, pd, radios):
-    d_test = np.sqrt(d2(X_test_pca[pc_cols].to_numpy()))
-    _fraud_te = X_test_pca["is_fraud"] == 1
-
-    _filas = []
-    for _r in radios.values():
-        _tn, _fp, _fn, _tp = confusion_matrix(_fraud_te, d_test >= _r).ravel()
-        _filas.append({"TN": _tn, "FP": _fp, "FN": _fn, "TP": _tp})
-    validacion = pd.DataFrame(_filas, index=[f"r{n}" for n in radios]).rename_axis(
-        "umbral"
+def _(
+    Sigma_inv,
+    X_test_pca,
+    evaluate,
+    mahalanobis_score,
+    mu,
+    pc_cols,
+    radios,
+):
+    d_test = mahalanobis_score(X_test_pca[pc_cols].to_numpy(), mu, Sigma_inv)
+    validacion = evaluate(
+        d_test,
+        X_test_pca["is_fraud"] == 1,
+        {f"r{n}": r for n, r in radios.items()},
     )
     validacion
     return (validacion,)
@@ -216,20 +216,24 @@ def _(mo):
 
 
 @app.cell
-def _(X_train_legit, X_train_pca, np, plt, radio_n):
+def _(
+    X_train_legit,
+    X_train_pca,
+    mahalanobis_fit,
+    mahalanobis_score,
+    np,
+    plt,
+    radio_n,
+):
     from matplotlib.patches import Ellipse
 
     _pc2 = ["PC1", "PC2"]
     _legit2 = X_train_legit[_pc2].to_numpy()
-    mu2 = _legit2.mean(axis=0)
-    Sigma2 = np.cov(_legit2, rowvar=False)
-    Sigma2_inv = np.linalg.inv(Sigma2)
+    mu2, Sigma2, Sigma2_inv = mahalanobis_fit(_legit2)
     _vals, _vecs = np.linalg.eigh(Sigma2)
 
-    _d2_legit2 = np.einsum(
-        "ij,jk,ik->i", _legit2 - mu2, Sigma2_inv, _legit2 - mu2
-    )
-    radios2 = {n: radio_n(np.sqrt(_d2_legit2), n) for n in [50, 75, 90, 95, 99]}
+    _d_legit2 = mahalanobis_score(_legit2, mu2, Sigma2_inv)
+    radios2 = {n: radio_n(_d_legit2, n) for n in [50, 75, 90, 95, 99]}
 
     _fig, _ax = plt.subplots(figsize=(7, 6))
     _ax.scatter(
@@ -271,10 +275,9 @@ def _(
     MODELS_DIR,
     Sigma2_inv,
     X_test_pca,
-    confusion_matrix,
+    evaluate,
+    mahalanobis_score,
     mu2,
-    np,
-    pd,
     radios2,
     validacion,
 ):
@@ -284,15 +287,14 @@ def _(
     _var2 = _pca.explained_variance_ratio_[:2].sum()
     print(f"Varianza explicada PC1+PC2: {_var2:.1%}")
 
-    _c2 = X_test_pca[["PC1", "PC2"]].to_numpy() - mu2
-    _d2t2 = np.sqrt(np.einsum("ij,jk,ik->i", _c2, Sigma2_inv, _c2))
-    _fraud_te = X_test_pca["is_fraud"] == 1
-
-    _filas = []
-    for _r in radios2.values():
-        _tn, _fp, _fn, _tp = confusion_matrix(_fraud_te, _d2t2 >= _r).ravel()
-        _filas.append({"TN": _tn, "FP": _fp, "FN": _fn, "TP": _tp})
-    _val2 = pd.DataFrame(_filas, index=validacion.index)
+    _d_test2 = mahalanobis_score(
+        X_test_pca[["PC1", "PC2"]].to_numpy(), mu2, Sigma2_inv
+    )
+    _val2 = evaluate(
+        _d_test2,
+        X_test_pca["is_fraud"] == 1,
+        {f"r{n}": r for n, r in radios2.items()},
+    )
 
     comparacion = validacion.join(_val2, lsuffix=" (10 comps)", rsuffix=" (2 comps)")
     comparacion
