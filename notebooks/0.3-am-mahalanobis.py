@@ -16,8 +16,9 @@ def _():
     import matplotlib.pyplot as plt
     import numpy as np
     import pandas as pd
+    from sklearn.metrics import confusion_matrix
 
-    return np, pd, plt
+    return confusion_matrix, np, pd, plt
 
 
 @app.cell(hide_code=True)
@@ -182,25 +183,21 @@ def _(mo):
     ## Validación con `X_test_pca`
 
     Regla de detección por umbral: un punto **fuera** de la bola se reporta como fraude. **FP** = no fraudulentas marcadas como fraude (falsos positivos); **FN** = fraudes dentro de la bola que se escapan (falsos negativos). Solo hay 8 fraudes en test — los FN se leen de a uno.
+
+    Cada renglón es una **matriz de confusión en un renglón** `[TN, FP, FN, TP]` (formato del entregable), calculada con `sklearn.metrics.confusion_matrix`.
     """)
     return
 
 
 @app.cell
-def _(X_test_pca, d2, np, pc_cols, pd, radios):
+def _(X_test_pca, confusion_matrix, d2, np, pc_cols, pd, radios):
     d_test = np.sqrt(d2(X_test_pca[pc_cols].to_numpy()))
     _fraud_te = X_test_pca["is_fraud"] == 1
 
     _filas = []
     for _r in radios.values():
-        _fuera = d_test >= _r
-        _filas.append(
-            {
-                "FP (no fraudulentas fuera)": int((_fuera & ~_fraud_te).sum()),
-                "FN (fraudes dentro)": int((~_fuera & _fraud_te).sum()),
-                "fraudes detectados": int((_fuera & _fraud_te).sum()),
-            }
-        )
+        _tn, _fp, _fn, _tp = confusion_matrix(_fraud_te, d_test >= _r).ravel()
+        _filas.append({"TN": _tn, "FP": _fp, "FN": _fn, "TP": _tp})
     validacion = pd.DataFrame(_filas, index=[f"r{n}" for n in radios]).rename_axis(
         "umbral"
     )
@@ -270,7 +267,17 @@ def _(mo):
 
 
 @app.cell
-def _(MODELS_DIR, Sigma2_inv, X_test_pca, mu2, np, pd, radios2, validacion):
+def _(
+    MODELS_DIR,
+    Sigma2_inv,
+    X_test_pca,
+    confusion_matrix,
+    mu2,
+    np,
+    pd,
+    radios2,
+    validacion,
+):
     import joblib
 
     _pca = joblib.load(MODELS_DIR / "pca.joblib")
@@ -283,14 +290,8 @@ def _(MODELS_DIR, Sigma2_inv, X_test_pca, mu2, np, pd, radios2, validacion):
 
     _filas = []
     for _r in radios2.values():
-        _fuera = _d2t2 >= _r
-        _filas.append(
-            {
-                "FP (no fraudulentas fuera)": int((_fuera & ~_fraud_te).sum()),
-                "FN (fraudes dentro)": int((~_fuera & _fraud_te).sum()),
-                "fraudes detectados": int((_fuera & _fraud_te).sum()),
-            }
-        )
+        _tn, _fp, _fn, _tp = confusion_matrix(_fraud_te, _d2t2 >= _r).ravel()
+        _filas.append({"TN": _tn, "FP": _fp, "FN": _fn, "TP": _tp})
     _val2 = pd.DataFrame(_filas, index=validacion.index)
 
     comparacion = validacion.join(_val2, lsuffix=" (10 comps)", rsuffix=" (2 comps)")
