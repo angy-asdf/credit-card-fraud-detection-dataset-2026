@@ -301,5 +301,70 @@ def _(
     return (comparacion,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Eficiencia como métrica escalar
+
+    La matriz de confusión lo muestra por conteos; para responder "¿pierde eficiencia?" con un número, `sklearn.metrics` da las métricas estándar por configuración y umbral:
+
+    - **recall** $= TP/(TP+FN)$: fracción de fraudes detectados — la métrica que de verdad importa aquí
+    - **precision** $= TP/(TP+FP)$: de lo marcado como fraude, cuánto sí era
+    - **f1**: media armónica de precision y recall
+    - **accuracy** $= (TP+TN)/N$: ojo — con 377/385 no fraudulentas, un clasificador que marca todo como "no fraude" ya tiene ~98% de accuracy; **engaña en datos desbalanceados**
+    """)
+    return
+
+
+@app.cell
+def _(
+    Sigma2_inv,
+    Sigma_inv,
+    X_test_pca,
+    mahalanobis_score,
+    mu,
+    mu2,
+    pc_cols,
+    pd,
+    radios,
+    radios2,
+):
+    from sklearn.metrics import (
+        accuracy_score,
+        f1_score,
+        precision_score,
+        recall_score,
+    )
+
+    _y = X_test_pca["is_fraud"] == 1
+    _d10 = mahalanobis_score(X_test_pca[pc_cols].to_numpy(), mu, Sigma_inv)
+    _d2 = mahalanobis_score(
+        X_test_pca[["PC1", "PC2"]].to_numpy(), mu2, Sigma2_inv
+    )
+
+    _filas = []
+    for _n in radios:
+        for _cfg, _d, _r in [
+            ("10 comps", _d10, radios[_n]),
+            ("2 comps", _d2, radios2[_n]),
+        ]:
+            _pred = _d >= _r
+            _filas.append(
+                {
+                    "config": _cfg,
+                    "umbral": f"r{_n}",
+                    "accuracy": accuracy_score(_y, _pred),
+                    "precision": precision_score(_y, _pred, zero_division=0),
+                    "recall": recall_score(_y, _pred),
+                    "f1": f1_score(_y, _pred, zero_division=0),
+                }
+            )
+    eficiencia = (
+        pd.DataFrame(_filas).set_index(["config", "umbral"]).round(3)
+    )
+    eficiencia
+    return (eficiencia,)
+
+
 if __name__ == "__main__":
     app.run()
